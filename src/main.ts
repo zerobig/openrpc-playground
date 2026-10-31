@@ -163,7 +163,29 @@ contentEl.addEventListener('click', (e) => {
   }
 });
 
-const specUrl = new URLSearchParams(location.search).get('spec');
+function resolveSpecUrl(): string | null {
+  // 1. Query-параметр
+  const fromQuery = new URLSearchParams(location.search).get('spec');
+  if (fromQuery && fromQuery.trim()) {
+    return fromQuery.trim();
+  }
+
+  // 2. Глобальная переменная (типизированный доступ)
+  const globalUrl = (window as Window & { OPENRPC_SPEC_URL?: string }).OPENRPC_SPEC_URL;
+  if (typeof globalUrl === 'string' && globalUrl.trim()) {
+    return globalUrl.trim();
+  }
+
+  // 3. Meta-тег (приведение к HTMLMetaElement)
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="openrpc-spec-url"]');
+  if (meta?.content?.trim()) {
+    return meta.content.trim();
+  }
+
+  return null;
+}
+
+const specUrl = resolveSpecUrl();
 if (specUrl) {
   urlInput.value = specUrl;
   void loadFromUrl(specUrl);
