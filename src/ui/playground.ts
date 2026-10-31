@@ -3,10 +3,14 @@ import { state } from '../state';
 import { escapeHtml, $ } from '../utils';
 import {
   buildExampleParams,
+  callBatch,
   callRpc,
   getDefaultServerUrl,
   type RpcCallResult,
 } from '../api';
+import { t } from '../i18n';
+
+let nextBatchId = 1;
 
 export function renderPlayground(
   container: HTMLElement,
@@ -17,11 +21,13 @@ export function renderPlayground(
   const defaultUrl = getDefaultServerUrl(doc);
   const savedUrl = state.servers.get(method.name);
   const selectedUrl = savedUrl ?? defaultUrl ?? '';
+  const auth = state.auths.get(method.name) ?? '';
+  const byName = method.paramStructure === 'by-name';
 
   let html = '';
 
   if (servers.length > 1) {
-    html += `<div class="pg-row"><label for="pgServer">Сервер:</label><select id="pgServer">`;
+    html += `<div class="pg-row"><label for="pgServer">${escapeHtml(t('pg.server'))}</label><select id="pgServer">`;
     for (const s of servers) {
       const u = (s.url || '').replace(/\/+$/, '');
       const label = (s.name ? s.name + ' — ' : '') + u;
@@ -29,37 +35,50 @@ export function renderPlayground(
     }
     html += `</select></div>`;
   } else if (!defaultUrl) {
-    html += `<p class="empty-detail">В схеме нет <code>servers[].url</code>. Playground не сможет отправить запрос.</p>`;
+    html += `<p class="empty-detail">${escapeHtml(t('pg.noServer'))}</p>`;
   }
 
   const draft = state.drafts.get(method.name);
   const paramsText = draft ?? JSON.stringify(buildExampleParams(method), null, 2);
-  const byName = method.paramStructure === 'by-name';
+  const labelKey = byName ? 'pg.params.labelByName' : 'pg.params.labelByPosition';
 
-  html += `<label class="muted" style="font-size:0.85rem;display:block;margin-bottom:4px;">Параметры (JSON, ${byName ? 'объект' : 'массив'})</label>`;
+  html += `<label class="muted" style="font-size:0.85rem;display:block;margin-bottom:4px;">${escapeHtml(t(labelKey))}</label>`;
   html += `<textarea id="pgParams" class="pg-editor" spellcheck="false">${escapeHtml(paramsText)}</textarea>`;
 
   html += `<div class="pg-actions">
-    <button id="pgSend" class="btn btn-primary">Отправить</button>
-    <button id="pgReset" class="btn">Сбросить</button>
+    <button id="pgSend" class="btn btn-primary">${escapeHtml(t('pg.send'))}</button>
+    <button id="pgAddBatch" class="btn">${escapeHtml(t('pg.addToBatch'))}</button>
+    <button id="pgReset" class="btn">${escapeHtml(t('pg.reset'))}</button>
     <span class="pg-spacer"></span>
     <span id="pgHint" class="muted" style="font-size:0.8rem;"></span>
   </div>`;
 
+  html += `<div class="pg-row" style="margin-top:8px;">
+    <label for="pgAuth">${escapeHtml(t('pg.auth.label'))}</label>
+    <input id="pgAuth" type="text" class="pg-auth"
+      placeholder="${escapeHtml(t('pg.auth.placeholder'))}"
+      value="${escapeHtml(auth)}" autocomplete="off" spellcheck="false" />
+  </div>`;
+
+  html += `<div id="batchContainer"></div>`;
+
   html += `<div class="pg-response" id="pgResponse">
-    <div class="pg-response-head"><span class="muted">Ответ появится здесь после отправки.</span></div>
+    <div class="pg-response-head"><span class="muted">${escapeHtml(t('pg.response.placeholder'))}</span></div>
   </div>`;
 
   container.innerHTML = html;
 
   bindPlayground(method, selectedUrl);
+  updateBatchPanel();
 }
 
 function bindPlayground(method: Method, initialUrl: string): void {
   const pgParams = $<HTMLTextAreaElement>('pgParams');
   const pgSend = $<HTMLButtonElement>('pgSend');
+  const pgAddBatch = $<HTMLButtonElement>('pgAddBatch');
   const pgReset = $<HTMLButtonElement>('pgReset');
   const pgHint = $<HTMLSpanElement>('pgHint');
+  const pgAuth = $<HTMLInputElement>('pgAuth');
   const responseBox = $<HTMLDivElement>('pgResponse');
   const pgServer = document.getElementById('pgServer') as HTMLSelectElement | null;
 
@@ -73,8 +92,12 @@ function bindPlayground(method: Method, initialUrl: string): void {
       pgHint.textContent = '';
     } catch {
       pgParams.classList.add('invalid');
-      pgHint.textContent = '⚠ JSON невалиден';
+      pgHint.textContent = t('pg.invalidJson');
     }
+  });
+
+  pgAuth.addEventListener('input', () => {
+    state.auths.set(method.name, pgAuth.value);
   });
 
   if (pgServer) {
@@ -93,34 +116,60 @@ function bindPlayground(method: Method, initialUrl: string): void {
     pgHint.textContent = '';
   });
 
-  const send = async (): Promise<void> => {
-    if (!currentUrl) {
-      showError(responseBox, 'Нет URL сервера в схеме');
-      return;
-    }
-
-    let params: unknown;
+  const readParams = (): { ok: true; params: unknown } | { ok: false; error: string } => {
     try {
       const raw = (pgParams.value || '').trim();
-      params = raw === ''
-        ? (method.paramStructure === 'by-name' ? {} : [])
-        : JSON.parse(raw);
+      const params =
+        raw === '' ? (method.paramStructure === 'by-name' ? {} : []) : JSON.parse(raw);
+      return { ok: true, params };
     } catch (e) {
-      showError(responseBox, 'Невалидный JSON в параметрах: ' + (e as Error).message);
+      return { ok: false, error: (e as Error).message };
+    }
+  };
+
+  const send = async (): Promise<void> => {
+    if (!currentUrl) {
+      showError(responseBox, t('pg.error.noServer'));
+      return;
+    }
+    const parsed = readParams();
+    if (!parsed.ok) {
+      showError(responseBox, t('pg.error.invalidParams', { message: parsed.error }));
       return;
     }
 
     pgSend.disabled = true;
-    const orig = pgSend.textContent;
-    pgSend.textContent = 'Отправка…';
+    const orig = pgSend.textContent ?? t('pg.send');
+    pgSend.textContent = t('pg.sending');
     try {
-      const result = await callRpc(currentUrl, method, params);
+      const result = await callRpc(
+        currentUrl,
+        method,
+        parsed.params,
+        state.auths.get(method.name),
+      );
       renderResponse(responseBox, result, currentUrl);
     } finally {
       pgSend.disabled = false;
       pgSend.textContent = orig;
     }
   };
+
+  pgAddBatch.addEventListener('click', () => {
+    const parsed = readParams();
+    if (!parsed.ok) {
+      showError(responseBox, t('pg.error.invalidParams', { message: parsed.error }));
+      return;
+    }
+    state.batch.push({
+      id: nextBatchId++,
+      methodName: method.name,
+      params: parsed.params,
+      serverUrl: currentUrl,
+      auth: state.auths.get(method.name) ?? '',
+    });
+    updateBatchPanel();
+  });
 
   pgSend.addEventListener('click', () => void send());
   pgParams.addEventListener('keydown', (e) => {
@@ -131,8 +180,82 @@ function bindPlayground(method: Method, initialUrl: string): void {
   });
 }
 
+function updateBatchPanel(): void {
+  const container = document.getElementById('batchContainer');
+  if (!container) return;
+  container.innerHTML = renderBatchPanelHtml();
+  bindBatchPanel(container);
+}
+
+function renderBatchPanelHtml(): string {
+  if (!state.batch.length) return '';
+  const targetServer = state.batch[0].serverUrl || '—';
+  let html = `<div class="batch-panel">
+    <div class="batch-head">
+      <strong>${escapeHtml(t('pg.batch.title', { n: state.batch.length }))}</strong>
+      <span class="muted" style="font-family:monospace;font-size:0.78rem;">${escapeHtml(t('pg.batch.targetServer'))} ${escapeHtml(targetServer)}</span>
+      <span class="pg-spacer"></span>
+      <button id="pgBatchSend" class="btn btn-primary" style="padding:4px 12px;font-size:0.8rem;">${escapeHtml(t('pg.batch.send'))}</button>
+      <button id="pgBatchClear" class="btn" style="padding:4px 12px;font-size:0.8rem;">${escapeHtml(t('pg.batch.clear'))}</button>
+    </div>
+    <ul class="batch-list">`;
+  for (const item of state.batch) {
+    html += `<li>
+      <code>${escapeHtml(item.methodName)}</code>
+      <span class="muted">#${item.id}</span>
+      <span class="batch-params">${escapeHtml(JSON.stringify(item.params))}</span>
+      <button class="batch-remove" data-batch-id="${item.id}" title="${escapeHtml(t('pg.batch.remove'))}">×</button>
+    </li>`;
+  }
+  html += `</ul></div>`;
+  return html;
+}
+
+function bindBatchPanel(container: HTMLElement): void {
+  const sendBtn = container.querySelector<HTMLButtonElement>('#pgBatchSend');
+  const clearBtn = container.querySelector<HTMLButtonElement>('#pgBatchClear');
+
+  container.querySelectorAll<HTMLElement>('.batch-remove').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = Number(btn.dataset.batchId);
+      state.batch = state.batch.filter((it) => it.id !== id);
+      updateBatchPanel();
+    });
+  });
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      state.batch = [];
+      updateBatchPanel();
+    });
+  }
+
+  if (sendBtn) {
+    sendBtn.addEventListener('click', async () => {
+      const responseBox = document.getElementById('pgResponse');
+      if (!responseBox) return;
+      if (!state.batch.length) return;
+      const first = state.batch[0];
+      if (!first.serverUrl) {
+        showError(responseBox, t('pg.batch.noServer'));
+        return;
+      }
+      sendBtn.disabled = true;
+      const orig = sendBtn.textContent ?? t('pg.batch.send');
+      sendBtn.textContent = t('pg.batch.sending');
+      try {
+        const result = await callBatch(first.serverUrl, state.batch, first.auth);
+        renderResponse(responseBox, result, first.serverUrl);
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = orig;
+      }
+    });
+  }
+}
+
 function showError(box: HTMLElement, message: string): void {
-  box.innerHTML = `<div class="pg-response-head"><span class="pg-status err">Ошибка</span></div>
+  box.innerHTML = `<div class="pg-response-head"><span class="pg-status err">${escapeHtml(t('pg.error.title'))}</span></div>
     <div class="pg-empty">${escapeHtml(message)}</div>`;
 }
 
@@ -142,41 +265,40 @@ function renderResponse(box: HTMLElement, r: RpcCallResult, url: string): void {
 
   if (r.networkError) {
     cls = 'err';
-    statusLabel = `Сетевая ошибка · ${r.ms} ms`;
+    statusLabel = t('pg.status.networkError', { ms: r.ms });
   } else if (!r.ok) {
     cls = 'err';
-    statusLabel = `HTTP ${r.status} ${r.statusText} · ${r.ms} ms`;
+    statusLabel = t('pg.status.http', { status: r.status, statusText: r.statusText, ms: r.ms });
   } else if (r.rpcError) {
     cls = 'warn';
-    statusLabel = `HTTP ${r.status} · JSON-RPC error · ${r.ms} ms`;
+    statusLabel = t('pg.status.rpcError', { status: r.status, ms: r.ms });
   } else {
-    statusLabel = `HTTP ${r.status} ${r.statusText} · ${r.ms} ms`;
+    statusLabel = t('pg.status.http', { status: r.status, statusText: r.statusText, ms: r.ms });
   }
 
   let bodyHtml: string;
   if (r.networkError) {
     bodyHtml = `<pre>${escapeHtml(
-      `Не удалось выполнить запрос к ${url}\n\n${r.networkError}\n\n` +
-        `Возможные причины:\n• сервер недоступен\n• CORS запрещает запрос из браузера\n• неверная схема URL`,
+      t('pg.network.message', { url, error: r.networkError }),
     )}</pre>`;
   } else if (r.bodyPretty) {
     bodyHtml = `<pre>${escapeHtml(r.bodyPretty)}</pre>`;
   } else {
-    bodyHtml = `<div class="pg-empty">Пустой ответ.</div>`;
+    bodyHtml = `<div class="pg-empty">${escapeHtml(t('pg.response.empty'))}</div>`;
   }
 
   box.innerHTML = `<div class="pg-response-head">
     <span class="pg-status ${cls}">${escapeHtml(statusLabel)}</span>
     <span class="pg-spacer"></span>
-    <button class="btn" id="pgCopyResp" style="padding:4px 10px;font-size:0.75rem;">Копировать</button>
+    <button class="btn" id="pgCopyResp" style="padding:4px 10px;font-size:0.75rem;">${escapeHtml(t('pg.response.copy'))}</button>
   </div>${bodyHtml}`;
 
   const copyBtn = document.getElementById('pgCopyResp') as HTMLButtonElement | null;
   if (copyBtn) {
     copyBtn.addEventListener('click', () => {
       navigator.clipboard.writeText(r.bodyText || '').then(() => {
-        copyBtn.textContent = 'Скопировано!';
-        setTimeout(() => (copyBtn.textContent = 'Копировать'), 1500);
+        copyBtn.textContent = t('pg.response.copied');
+        setTimeout(() => (copyBtn.textContent = t('pg.response.copy')), 1500);
       });
     });
   }

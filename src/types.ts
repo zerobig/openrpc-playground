@@ -14,6 +14,7 @@ export interface Server {
 
 export interface Method {
   name: string;
+  summary?: string;
   description?: string;
   params?: Param[];
   result?: Result;
@@ -25,6 +26,7 @@ export interface Method {
 
 export interface Param {
   name?: string;
+  summary?: string;
   description?: string;
   required?: boolean;
   schema?: Schema;
@@ -32,6 +34,7 @@ export interface Param {
 
 export interface Result {
   name?: string;
+  summary?: string;
   description?: string;
   schema?: Schema;
 }
@@ -39,6 +42,7 @@ export interface Result {
 export interface Schema {
   type?: string;
   $ref?: string;
+  summary?: string;
   description?: string;
   properties?: Record<string, Schema>;
   required?: string[];
@@ -55,6 +59,7 @@ export interface ErrorObject {
 
 export interface MethodExample {
   name?: string;
+  summary?: string;
   params?: unknown;
   result?: unknown;
 }

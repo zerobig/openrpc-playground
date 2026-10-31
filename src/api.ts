@@ -1,4 +1,5 @@
 import type { Method, OpenRpcDocument, Schema } from './types';
+import type { BatchItem } from './state';
 
 export async function fetchDocument(url: string): Promise<OpenRpcDocument> {
   const resp = await fetch(url, { headers: { Accept: 'application/json' } });
@@ -25,18 +26,22 @@ export interface RpcCallResult {
   networkError: string | null;
 }
 
-export async function callRpc(
-  serverUrl: string,
-  method: Method,
-  params: unknown,
+async function postJson(
+  url: string,
+  body: unknown,
+  auth?: string,
 ): Promise<RpcCallResult> {
-  const body = { jsonrpc: '2.0', id: Date.now(), method: method.name, params };
-  const t0 = performance.now();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  if (auth && auth.trim()) headers['Authorization'] = auth.trim();
 
+  const t0 = performance.now();
   try {
-    const resp = await fetch(serverUrl, {
+    const resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers,
       body: JSON.stringify(body),
     });
     const ms = Math.round(performance.now() - t0);
@@ -47,7 +52,24 @@ export async function callRpc(
     try {
       const parsed: unknown = JSON.parse(text);
       pretty = JSON.stringify(parsed, null, 2);
-      if (parsed && typeof parsed === 'object' && 'error' in parsed && (parsed as { error?: unknown }).error) {
+      if (Array.isArray(parsed)) {
+        // Batch: покажем первую ошибку как индикатор
+        const firstErr = parsed.find(
+          (it) =>
+            it &&
+            typeof it === 'object' &&
+            'error' in it &&
+            (it as { error?: unknown }).error,
+        );
+        if (firstErr) {
+          rpcError = (firstErr as { error: { code: number; message: string } }).error;
+        }
+      } else if (
+        parsed &&
+        typeof parsed === 'object' &&
+        'error' in parsed &&
+        (parsed as { error?: unknown }).error
+      ) {
         rpcError = (parsed as { error: { code: number; message: string } }).error;
       }
     } catch {
@@ -78,6 +100,33 @@ export async function callRpc(
   }
 }
 
+export function callRpc(
+  serverUrl: string,
+  method: Method,
+  params: unknown,
+  auth?: string,
+): Promise<RpcCallResult> {
+  return postJson(
+    serverUrl,
+    { jsonrpc: '2.0', id: Date.now(), method: method.name, params },
+    auth,
+  );
+}
+
+export function callBatch(
+  serverUrl: string,
+  items: BatchItem[],
+  auth?: string,
+): Promise<RpcCallResult> {
+  const payload = items.map((it) => ({
+    jsonrpc: '2.0',
+    id: it.id,
+    method: it.methodName,
+    params: it.params,
+  }));
+  return postJson(serverUrl, payload, auth);
+}
+
 export function exampleFromSchema(schema: Schema | undefined): unknown {
   if (!schema || typeof schema !== 'object') return null;
   if (schema.default !== undefined) return schema.default;
@@ -85,11 +134,15 @@ export function exampleFromSchema(schema: Schema | undefined): unknown {
   if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum[0];
   if (schema.$ref) return null;
   switch (schema.type) {
-    case 'string': return '';
+    case 'string':
+      return '';
     case 'number':
-    case 'integer': return 0;
-    case 'boolean': return false;
-    case 'array': return [];
+    case 'integer':
+      return 0;
+    case 'boolean':
+      return false;
+    case 'array':
+      return [];
     case 'object': {
       const obj: Record<string, unknown> = {};
       if (schema.properties) {
@@ -99,7 +152,8 @@ export function exampleFromSchema(schema: Schema | undefined): unknown {
       }
       return obj;
     }
-    default: return null;
+    default:
+      return null;
   }
 }
 

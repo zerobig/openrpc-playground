@@ -4,14 +4,22 @@ export type FlatItem =
   | { id: string; kind: 'method'; name: string; group: string; data: Method }
   | { id: string; kind: 'type'; name: string; group: string; data: Schema };
 
+export interface BatchItem {
+  id: number;
+  methodName: string;
+  params: unknown;
+  serverUrl: string;
+  auth: string;
+}
+
 export interface AppState {
   doc: OpenRpcDocument | null;
   items: FlatItem[];
   activeId: string | null;
-  /** Черновики параметров per-method */
   drafts: Map<string, string>;
-  /** Выбранный URL сервера per-method */
   servers: Map<string, string>;
+  auths: Map<string, string>;
+  batch: BatchItem[];
 }
 
 export const state: AppState = {
@@ -20,4 +28,6 @@ export const state: AppState = {
   activeId: null,
   drafts: new Map(),
   servers: new Map(),
+  auths: new Map(),
+  batch: [],
 };

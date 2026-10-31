@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/zerobig/openrpc-playground/security/advisories/new
+    about: Please report security issues privately, not as a public issue.
+  - name: OpenRPC specification
+    url: https://spec.open-rpc.org/
+    about: Questions about the spec itself belong here.
+  - name: Discussions
+    url: https://github.com/zerobig/openrpc-playground/discussions
+    about: General questions, show-and-tell, ideas that aren't yet a proposal.

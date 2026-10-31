@@ -245,3 +245,91 @@ pre {
   #content { padding: 16px; }
   header h1 { font-size: 1rem; }
 }
+/* $ref-ссылки */
+.ref-link { color: var(--accent); text-decoration: none; }
+.ref-link:hover { text-decoration: underline; }
+.ref-link code { color: inherit; background: transparent; padding: 0; }
+
+/* summary + сворачиваемый description */
+.summary { font-size: 0.95rem; margin: 4px 0 8px; }
+.desc-details { margin-bottom: 8px; }
+.desc-details summary { cursor: pointer; font-size: 0.85rem; margin-bottom: 4px; }
+.desc-details .subtitle { margin-top: 6px; margin-bottom: 0; }
+
+/* Authorization в playground */
+.pg-auth {
+  flex: 1;
+  min-width: 200px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  outline: none;
+}
+.pg-auth:focus { border-color: var(--accent); }
+
+/* Batch */
+.batch-panel {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.batch-head {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-soft);
+  font-size: 0.85rem;
+}
+.batch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.batch-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+.batch-list li:last-child { border-bottom: none; }
+.batch-params {
+  flex: 1;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.batch-remove {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 4px;
+}
+.batch-remove:hover { color: var(--err); }
+/* Language switcher */
+.lang-switcher {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 0.85rem;
+  cursor: pointer;
+  outline: none;
+  color: var(--text);
+}
+.lang-switcher:focus { border-color: var(--accent); }

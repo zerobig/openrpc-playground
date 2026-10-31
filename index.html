@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,11 +7,12 @@
 </head>
 <body>
   <header>
-    <h1>OpenRPC Viewer</h1>
+    <h1 data-i18n="app.title">OpenRPC Viewer</h1>
     <div class="load-bar">
-      <input id="urlInput" type="url" placeholder="URL к OpenRPC JSON (например, /openrpc.json)" />
-      <button id="loadUrlBtn" class="btn btn-primary">Загрузить</button>
+      <input id="urlInput" type="url" data-i18n-placeholder="app.urlPlaceholder" placeholder="OpenRPC JSON URL" />
+      <button id="loadUrlBtn" class="btn btn-primary" data-i18n="app.load">Load</button>
     </div>
+    <select id="langSwitcher" class="lang-switcher" aria-label="Language"></select>
   </header>
 
   <div class="status" id="status"></div>
@@ -19,19 +20,19 @@
   <main>
     <aside id="sidebar">
       <div class="search-box">
-        <input id="searchInput" type="search" placeholder="Поиск методов и типов…" />
+        <input id="searchInput" type="search" data-i18n-placeholder="app.searchPlaceholder" placeholder="Search…" />
       </div>
       <div id="tree">
         <div class="placeholder" style="padding: 32px 16px;">
-          <p>Схема не загружена.<br>Укажите URL.</p>
+          <p data-i18n="placeholder.noSpec">Schema not loaded. Enter a URL.</p>
         </div>
       </div>
     </aside>
 
     <section id="content">
       <div class="placeholder">
-        <h2>Добро пожаловать</h2>
-        <p>Загрузите OpenRPC-документ по URL, чтобы просмотреть методы и попробовать запросы.</p>
+        <h2 data-i18n="placeholder.welcome.title">Welcome</h2>
+        <p data-i18n="placeholder.welcome.text">Load an OpenRPC document…</p>
       </div>
     </section>
   </main>

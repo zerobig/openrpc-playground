@@ -1,17 +1,29 @@
 import './style.css';
 import type { OpenRpcDocument } from './types';
 import { state, type FlatItem } from './state';
-import { $, setStatus } from './utils';
+import { $, escapeHtml, setStatus } from './utils';
 import { fetchDocument } from './api';
 import { renderTree } from './ui/tree';
 import { renderMethodDetail } from './ui/method';
 import { renderTypeDetail } from './ui/type';
+import {
+  applyStaticTranslations,
+  getLocale,
+  LOCALES,
+  onLocaleChange,
+  setLocale,
+  t,
+  type Locale,
+} from './i18n';
 
 const urlInput = $<HTMLInputElement>('urlInput');
 const loadBtn = $<HTMLButtonElement>('loadUrlBtn');
 const searchInput = $<HTMLInputElement>('searchInput');
 const treeEl = $<HTMLDivElement>('tree');
 const contentEl = $<HTMLElement>('content');
+const langSwitcher = $<HTMLSelectElement>('langSwitcher');
+
+const TYPES_GROUP = '__types__';
 
 function buildFlatItems(doc: OpenRpcDocument): FlatItem[] {
   const items: FlatItem[] = [];
@@ -25,7 +37,7 @@ function buildFlatItems(doc: OpenRpcDocument): FlatItem[] {
       id: 'type:' + typeName,
       kind: 'type',
       name: typeName,
-      group: 'Типы',
+      group: TYPES_GROUP,
       data: schemas[typeName],
     });
   }
@@ -53,6 +65,15 @@ function selectItem(id: string): void {
   } else {
     renderTypeDetail(contentEl, item.name, item.data);
   }
+  const activeEl = treeEl.querySelector<HTMLElement>('.tree-item.active');
+  if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+}
+
+function renderLoadedNoMethods(): void {
+  contentEl.innerHTML = `<div class="placeholder">
+    <h2>${escapeHtml(t('placeholder.loadedNoMethods.title'))}</h2>
+    <p>${escapeHtml(t('placeholder.loadedNoMethods.text'))}</p>
+  </div>`;
 }
 
 function loadDoc(doc: OpenRpcDocument): void {
@@ -61,11 +82,17 @@ function loadDoc(doc: OpenRpcDocument): void {
   state.activeId = null;
   state.drafts.clear();
   state.servers.clear();
+  state.auths.clear();
+  state.batch = [];
 
   const methodCount = doc.methods?.length ?? 0;
   const typeCount = Object.keys(doc.components?.schemas ?? {}).length;
   setStatus(
-    `Загружено: ${doc.info?.title ?? 'OpenRPC'} — методов: ${methodCount}, типов: ${typeCount}`,
+    t('status.loaded', {
+      title: doc.info?.title ?? 'OpenRPC',
+      methods: methodCount,
+      types: typeCount,
+    }),
   );
 
   refreshTree();
@@ -74,29 +101,59 @@ function loadDoc(doc: OpenRpcDocument): void {
   if (firstMethod) {
     selectItem(firstMethod.id);
   } else {
-    contentEl.innerHTML = `<div class="placeholder"><h2>Схема загружена</h2><p>В документе нет методов.</p></div>`;
+    renderLoadedNoMethods();
   }
 }
 
 async function loadFromUrl(url: string): Promise<void> {
   if (!url) {
-    setStatus('Введите URL.', true);
+    setStatus(t('status.emptyUrl'), true);
     return;
   }
-  setStatus('Загрузка…');
+  setStatus(t('status.loading'));
   try {
     const doc = await fetchDocument(url);
     loadDoc(doc);
   } catch (err) {
-    setStatus(`Ошибка загрузки: ${(err as Error).message}`, true);
+    setStatus(t('status.error', { message: (err as Error).message }), true);
   }
 }
+
+// ---------- инициализация i18n ----------
+applyStaticTranslations();
+langSwitcher.innerHTML = LOCALES.map(
+  (l) => `<option value="${l.code}">${escapeHtml(l.label)}</option>`,
+).join('');
+langSwitcher.value = getLocale();
+langSwitcher.addEventListener('change', () => {
+  setLocale(langSwitcher.value as Locale);
+});
+
+onLocaleChange((locale) => {
+  langSwitcher.value = locale;
+  if (state.doc) {
+    refreshTree();
+    if (state.activeId) selectItem(state.activeId);
+    else renderLoadedNoMethods();
+  }
+  // Если doc ещё не загружен — статику уже обновил applyStaticTranslations.
+});
 
 loadBtn.addEventListener('click', () => void loadFromUrl(urlInput.value.trim()));
 urlInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') void loadFromUrl(urlInput.value.trim());
 });
 searchInput.addEventListener('input', refreshTree);
+
+contentEl.addEventListener('click', (e) => {
+  const target = e.target as HTMLElement;
+  const refEl = target.closest<HTMLElement>('[data-ref]');
+  if (refEl) {
+    e.preventDefault();
+    const id = refEl.dataset.ref;
+    if (id) selectItem(id);
+  }
+});
 
 const specUrl = new URLSearchParams(location.search).get('spec');
 if (specUrl) {

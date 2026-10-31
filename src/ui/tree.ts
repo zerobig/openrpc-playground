@@ -1,5 +1,6 @@
 import type { FlatItem } from '../state';
 import { escapeHtml } from '../utils';
+import { t } from '../i18n';
 
 interface TreeOptions {
   items: FlatItem[];
@@ -8,11 +9,13 @@ interface TreeOptions {
   onSelect: (id: string) => void;
 }
 
+const TYPES_GROUP = '__types__';
+
 export function renderTree(treeEl: HTMLElement, opts: TreeOptions): void {
   const { items, filter, activeId, onSelect } = opts;
 
   if (!items.length) {
-    treeEl.innerHTML = `<div class="placeholder" style="padding:32px 16px;"><p>Нет элементов.</p></div>`;
+    treeEl.innerHTML = `<div class="placeholder" style="padding:32px 16px;"><p>${escapeHtml(t('placeholder.noItems'))}</p></div>`;
     return;
   }
 
@@ -21,12 +24,13 @@ export function renderTree(treeEl: HTMLElement, opts: TreeOptions): void {
     ? items.filter(
         (it) =>
           it.name.toLowerCase().includes(q) ||
+          (it.data.summary ?? '').toLowerCase().includes(q) ||
           (it.data.description ?? '').toLowerCase().includes(q),
       )
     : items;
 
   if (!filtered.length) {
-    treeEl.innerHTML = `<div class="placeholder" style="padding:32px 16px;"><p>Ничего не найдено.</p></div>`;
+    treeEl.innerHTML = `<div class="placeholder" style="padding:32px 16px;"><p>${escapeHtml(t('placeholder.noResults'))}</p></div>`;
     return;
   }
 
@@ -38,18 +42,20 @@ export function renderTree(treeEl: HTMLElement, opts: TreeOptions): void {
   }
 
   const sortedGroups = [...groups.keys()].sort((a, b) => {
-    if (a === 'Типы') return 1;
-    if (b === 'Типы') return -1;
+    if (a === TYPES_GROUP) return 1;
+    if (b === TYPES_GROUP) return -1;
     return a.localeCompare(b);
   });
 
   let html = '';
   for (const group of sortedGroups) {
-    html += `<div class="tree-group-title">${escapeHtml(group)}</div>`;
+    const groupLabel = group === TYPES_GROUP ? t('tree.group.types') : group;
+    html += `<div class="tree-group-title">${escapeHtml(groupLabel)}</div>`;
     for (const it of groups.get(group)!) {
       const active = it.id === activeId ? ' active' : '';
       const icon = it.kind === 'method' ? 'ƒ' : '◇';
-      html += `<div class="tree-item${active}" data-id="${escapeHtml(it.id)}" title="${escapeHtml(it.name)}">${icon} ${escapeHtml(it.name)}</div>`;
+      const tooltip = it.data.summary || it.data.description || it.name;
+      html += `<div class="tree-item${active}" data-id="${escapeHtml(it.id)}" title="${escapeHtml(tooltip)}">${icon} ${escapeHtml(it.name)}</div>`;
     }
   }
 
