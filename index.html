@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenRPC Viewer</title>
+</head>
+<body>
+  <header>
+    <h1>OpenRPC Viewer</h1>
+    <div class="load-bar">
+      <input id="urlInput" type="url" placeholder="URL к OpenRPC JSON (например, /openrpc.json)" />
+      <button id="loadUrlBtn" class="btn btn-primary">Загрузить</button>
+    </div>
+  </header>
+
+  <div class="status" id="status"></div>
+
+  <main>
+    <aside id="sidebar">
+      <div class="search-box">
+        <input id="searchInput" type="search" placeholder="Поиск методов и типов…" />
+      </div>
+      <div id="tree">
+        <div class="placeholder" style="padding: 32px 16px;">
+          <p>Схема не загружена.<br>Укажите URL.</p>
+        </div>
+      </div>
+    </aside>
+
+    <section id="content">
+      <div class="placeholder">
+        <h2>Добро пожаловать</h2>
+        <p>Загрузите OpenRPC-документ по URL, чтобы просмотреть методы и попробовать запросы.</p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
