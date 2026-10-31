@@ -15,8 +15,13 @@ Built with TypeScript + Vite and shipped as a **single `index.html`** file via
 [`vite-plugin-singlefile`](https://github.com/richardtallent/vite-plugin-singlefile).
 Drop it on any static host, attach it to a ticket, or open it from disk.
 
-> Originally built to explore 1C:Enterprise RPC services (`Demo_RPC`), but
-> works with any OpenRPC 1.x document.
+## Why this exists
+
+There is no sane, self-contained way to browse an OpenRPC schema and fire
+JSON-RPC requests against it without pulling in a framework, a CLI, or a full
+API client. Existing tools either assume OpenAPI/REST, require an account, or
+need a backend. This project is the smallest thing that solves exactly that:
+one HTML file, zero runtime dependencies, works offline.
 
 ## Features
 
@@ -32,13 +37,18 @@ Drop it on any static host, attach it to a ticket, or open it from disk.
 - **Batch requests** — queue multiple calls across methods and send one
   JSON-RPC batch. Target server is shown explicitly.
 - **Authorization header** — optional per-method `Authorization` value
-  (e.g. `Basic …`) forwarded with `fetch`. Useful for 1C services with
-  `UseBasicAuth = True`.
+  (e.g. `Basic …`, `Bearer …`) forwarded with `fetch`.
 - **Pre-declared errors** — `method.errors` rendered as a table before you
   send anything.
 - **i18n** — English (default) and Russian, switchable in the header.
   `?lang=en|ru` overrides storage; `?spec=<url>` auto-loads a schema.
 - **No tracking, no backend** — everything runs locally in the browser.
+
+## Used by
+
+- [zerobig/swagger-1c](https://github.com/zerobig/swagger-1c) — 1C:Enterprise
+  tooling that embeds this viewer. Independent project; issues with this
+  viewer belong here, not there.
 
 ## Quick start
 
