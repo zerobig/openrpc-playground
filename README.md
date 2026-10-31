@@ -134,6 +134,7 @@ override. Example:
 
 <!-- Option B: global before the bundle -->
 <script>window.OPENRPC_SPEC_URL = 'https://example.com/openrpc.json';</script>
+```
 
 ## Project structure
 
