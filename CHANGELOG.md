@@ -8,10 +8,12 @@ and this project adheres to
 
 ## [Unreleased]
 
-### Added
+### Changed
 
-- Nothing yet.
-
+- **Internal:** all UI rendering now uses a tiny zero-dependency tagged-template
+  engine (`src/view.ts`): `html\`...\`` templates, auto-escaping, `render()`.
+  No behavior change; markup code became shorter and XSS-safe by construction.
+  
 ## [0.1.0] - 2026-10-31
 
 ### Added

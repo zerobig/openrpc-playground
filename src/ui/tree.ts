@@ -1,5 +1,5 @@
 import type { FlatItem } from '../state';
-import { escapeHtml } from '../utils';
+import { html, render } from '../view';
 import { t } from '../i18n';
 
 interface TreeOptions {
@@ -15,7 +15,7 @@ export function renderTree(treeEl: HTMLElement, opts: TreeOptions): void {
   const { items, filter, activeId, onSelect } = opts;
 
   if (!items.length) {
-    treeEl.innerHTML = `<div class="placeholder" style="padding:32px 16px;"><p>${escapeHtml(t('placeholder.noItems'))}</p></div>`;
+    render(treeEl, html`<div class="placeholder" style="padding:32px 16px;"><p>${t('placeholder.noItems')}</p></div>`);
     return;
   }
 
@@ -30,7 +30,7 @@ export function renderTree(treeEl: HTMLElement, opts: TreeOptions): void {
     : items;
 
   if (!filtered.length) {
-    treeEl.innerHTML = `<div class="placeholder" style="padding:32px 16px;"><p>${escapeHtml(t('placeholder.noResults'))}</p></div>`;
+    render(treeEl, html`<div class="placeholder" style="padding:32px 16px;"><p>${t('placeholder.noResults')}</p></div>`);
     return;
   }
 
@@ -47,19 +47,21 @@ export function renderTree(treeEl: HTMLElement, opts: TreeOptions): void {
     return a.localeCompare(b);
   });
 
-  let html = '';
-  for (const group of sortedGroups) {
-    const groupLabel = group === TYPES_GROUP ? t('tree.group.types') : group;
-    html += `<div class="tree-group-title">${escapeHtml(groupLabel)}</div>`;
-    for (const it of groups.get(group)!) {
-      const active = it.id === activeId ? ' active' : '';
-      const icon = it.kind === 'method' ? 'ƒ' : '◇';
-      const tooltip = it.data.summary || it.data.description || it.name;
-      html += `<div class="tree-item${active}" data-id="${escapeHtml(it.id)}" title="${escapeHtml(tooltip)}">${icon} ${escapeHtml(it.name)}</div>`;
-    }
-  }
-
-  treeEl.innerHTML = html;
+  render(
+    treeEl,
+    html`${sortedGroups.map((group) => {
+      const groupLabel = group === TYPES_GROUP ? t('tree.group.types') : group;
+      return html`
+        <div class="tree-group-title">${groupLabel}</div>
+        ${groups.get(group)!.map((it) => {
+          const active = it.id === activeId ? ' active' : '';
+          const icon = it.kind === 'method' ? 'ƒ' : '◇';
+          const tooltip = it.data.summary || it.data.description || it.name;
+          return html`<div class="tree-item${active}" data-id="${it.id}" title="${tooltip}">${icon} ${it.name}</div>`;
+        })}
+      `;
+    })}`,
+  );
 
   treeEl.querySelectorAll<HTMLElement>('.tree-item').forEach((el) => {
     el.addEventListener('click', () => {

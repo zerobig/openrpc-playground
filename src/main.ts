@@ -1,7 +1,8 @@
 import './style.css';
 import type { OpenRpcDocument } from './types';
 import { state, type FlatItem } from './state';
-import { $, escapeHtml, setStatus } from './utils';
+import { $, setStatus } from './utils';
+import { html, render } from './view';
 import { fetchDocument } from './api';
 import { renderTree } from './ui/tree';
 import { renderMethodDetail } from './ui/method';
@@ -70,10 +71,15 @@ function selectItem(id: string): void {
 }
 
 function renderLoadedNoMethods(): void {
-  contentEl.innerHTML = `<div class="placeholder">
-    <h2>${escapeHtml(t('placeholder.loadedNoMethods.title'))}</h2>
-    <p>${escapeHtml(t('placeholder.loadedNoMethods.text'))}</p>
-  </div>`;
+  render(
+    contentEl,
+    html`
+      <div class="placeholder">
+        <h2>${t('placeholder.loadedNoMethods.title')}</h2>
+        <p>${t('placeholder.loadedNoMethods.text')}</p>
+      </div>
+    `,
+  );
 }
 
 function loadDoc(doc: OpenRpcDocument): void {
@@ -121,9 +127,10 @@ async function loadFromUrl(url: string): Promise<void> {
 
 // ---------- инициализация i18n ----------
 applyStaticTranslations();
-langSwitcher.innerHTML = LOCALES.map(
-  (l) => `<option value="${l.code}">${escapeHtml(l.label)}</option>`,
-).join('');
+render(
+  langSwitcher,
+  html`${LOCALES.map((l) => html`<option value="${l.code}">${l.label}</option>`)}`,
+);
 langSwitcher.value = getLocale();
 langSwitcher.addEventListener('change', () => {
   setLocale(langSwitcher.value as Locale);
@@ -139,6 +146,7 @@ onLocaleChange((locale) => {
   // Если doc ещё не загружен — статику уже обновил applyStaticTranslations.
 });
 
+// ---------- обработчики ----------
 loadBtn.addEventListener('click', () => void loadFromUrl(urlInput.value.trim()));
 urlInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') void loadFromUrl(urlInput.value.trim());

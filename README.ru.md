@@ -124,7 +124,8 @@ src/
 ├── style.css               # все стили (инлайнятся при сборке)
 ├── types.ts                # типы OpenRPC-документа
 ├── state.ts                # глобальное состояние (doc, items, drafts, batch, auths)
-├── utils.ts                # escapeHtml, safeJson, $ref link, schema type
+├── view.ts                 # tiny tagged-template engine (html``, render, escaping)
+├── utils.ts                # $, setStatus, refLink, schemaType, summaryDesc
 ├── api.ts                  # fetchDocument, callRpc, callBatch, example builder
 ├── i18n/
 │   ├── index.ts            # t(), setLocale, applyStaticTranslations, detect
@@ -136,6 +137,12 @@ src/
     ├── type.ts             # карточка типа
     └── playground.ts       # редактор, auth, batch, ответ
 ```
+
+**Рендеринг.** Вся разметка строится мини-движком шаблонов из `src/view.ts`:
+`html\`...\`` возвращает `TemplateResult`, `render(el, ...)` монтирует его.
+Интерполяции экранируются автоматически, поэтому UI-модули XSS-безопасны по
+построению. Без runtime-зависимостей. Для готового доверенного HTML
+(`$ref`-ссылки, pretty JSON) — `raw()`, `json()` или `code()`.
 
 ## Как добавить язык
 

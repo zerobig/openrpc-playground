@@ -1,4 +1,13 @@
 import type { Schema } from './types';
+import {
+  code,
+  escapeHtml,
+  html,
+  nothing,
+  raw,
+  type SafeHtml,
+  type TemplateResult,
+} from './view';
 
 export const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -12,49 +21,34 @@ export function setStatus(msg: string, isError = false): void {
   el.classList.toggle('error', isError);
 }
 
-export function escapeHtml(str: unknown): string {
-  if (str == null) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-export function safeJson(value: unknown, indent = 2): string {
-  try {
-    return escapeHtml(JSON.stringify(value, null, indent));
-  } catch {
-    return escapeHtml(String(value));
-  }
-}
-
-/** `#/components/schemas/X` → кликабельная ссылка на type:X. */
-export function renderRefLink(ref: string): string {
+/** `#/components/schemas/X` → clickable link to `type:X` in the tree. */
+export function refLink(ref: string): SafeHtml {
   const m = ref.match(/^#\/components\/schemas\/(.+)$/);
   if (m) {
     const name = m[1];
-    return `<a href="#type:${escapeHtml(name)}" data-ref="type:${escapeHtml(name)}" class="ref-link"><code>${escapeHtml(name)}</code></a>`;
+    return raw(
+      `<a href="#type:${escapeHtml(name)}" data-ref="type:${escapeHtml(name)}" class="ref-link"><code>${escapeHtml(name)}</code></a>`,
+    );
   }
-  return `<code>${escapeHtml(ref)}</code>`;
+  return code(ref);
 }
 
-/** Универсальный рендер «типа» схемы — учитывает $ref. */
-export function renderSchemaType(schema: Schema | undefined): string {
-  if (!schema) return '—';
-  if (schema.$ref) return renderRefLink(schema.$ref);
-  if (schema.type) return `<code>${escapeHtml(schema.type)}</code>`;
-  return '—';
+/** Schema type → `<code>type</code>` or a `$ref` link. */
+export function schemaType(schema: Schema | undefined): SafeHtml {
+  if (!schema) return raw('—');
+  if (schema.$ref) return refLink(schema.$ref);
+  if (schema.type) return code(schema.type);
+  return raw('—');
 }
 
-/** Собрать описание из summary + description для ячейки таблицы. */
-export function renderSummaryAndDescription(
+/** summary + description for a table cell (summary bold, description below). */
+export function summaryDesc(
   summary: string | undefined,
   description: string | undefined,
-): string {
-  const parts: string[] = [];
-  if (summary) parts.push(`<strong>${escapeHtml(summary)}</strong>`);
-  if (description) parts.push(escapeHtml(description));
-  return parts.join('<br>');
+): TemplateResult {
+  return html`
+    ${summary ? html`<strong>${summary}</strong>` : nothing}
+    ${summary && description ? html`<br>` : nothing}
+    ${description ?? nothing}
+  `;
 }

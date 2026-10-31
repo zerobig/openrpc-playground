@@ -43,15 +43,20 @@ Open `http://localhost:5173/?spec=<url-to-openrpc.json>` to auto-load a schema.
   single HTML file — every dependency is inlined.
 - **No frameworks.** The UI is plain DOM. If a change needs React/Vue/etc.,
   it belongs in a fork.
-- **No `innerHTML` with user data.** All dynamic strings go through
-  `escapeHtml()` from `src/utils.ts`. Schema text is untrusted input.
+- **Rendering.** All HTML is produced by the tagged template `html\`...\`` and
+  mounted with `render(el, ...)` from `src/view.ts`. Interpolations are
+  auto-escaped, so **do not** call `escapeHtml()` manually and **never** assign
+  to `innerHTML`. For pre-built trusted markup (`$ref` links, pretty-printed
+  JSON) use `raw()`, `json()`, or `code()` — and nothing else. Schema text is
+  untrusted input. Events are bound after `render()` via `querySelector`; keep
+  that pattern so DOM nodes stay replaceable.
 - **State** lives in `src/state.ts`. Don't introduce module-level `let`
   outside `state.ts` and `i18n/index.ts`.
 - **Strings** go through `t('key')` from `src/i18n`. No hard-coded user-facing
   text in UI modules.
 - **CSS** — one file (`src/style.css`). Use the existing CSS variables.
-- **File layout** — UI in `src/ui/`, network in `src/api.ts`, translations in
-  `src/i18n/`.
+- **File layout** — UI in `src/ui/`, rendering engine in `src/view.ts`, network
+  in `src/api.ts`, translations in `src/i18n/`.
 
 ## Translations
 

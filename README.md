@@ -123,7 +123,8 @@ src/
 ├── style.css               # all styles (inlined at build)
 ├── types.ts                # OpenRPC document typings
 ├── state.ts                # global state (doc, items, drafts, batch, auths)
-├── utils.ts                # escapeHtml, safeJson, $ref link, schema type
+├── view.ts                 # tiny tagged-template engine (html``, render, escaping)
+├── utils.ts                # $, setStatus, refLink, schemaType, summaryDesc
 ├── api.ts                  # fetchDocument, callRpc, callBatch, example builder
 ├── i18n/
 │   ├── index.ts            # t(), setLocale, applyStaticTranslations, locale detect
@@ -135,6 +136,12 @@ src/
     ├── type.ts             # type detail card
     └── playground.ts       # editor, auth header, batch panel, response
 ```
+
+**Rendering.** All markup is produced by a tiny tagged-template engine in
+`src/view.ts`: `html\`...\`` returns a `TemplateResult`, `render(el, ...)`
+mounts it. Interpolations are auto-escaped, so UI modules are XSS-safe by
+construction. No runtime dependencies. For pre-built trusted markup (`$ref`
+links, pretty JSON) use `raw()`, `json()`, or `code()`.
 
 ## Adding a language
 

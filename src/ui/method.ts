@@ -1,10 +1,6 @@
 import type { Method, OpenRpcDocument } from '../types';
-import {
-  escapeHtml,
-  renderSchemaType,
-  renderSummaryAndDescription,
-  safeJson,
-} from '../utils';
+import { html, json, nothing, render } from '../view';
+import { schemaType, summaryDesc } from '../utils';
 import { t } from '../i18n';
 import { renderPlayground } from './playground';
 
@@ -15,82 +11,94 @@ export function renderMethodDetail(
 ): void {
   const params = method.params ?? [];
 
-  let html = `<div class="card">`;
-  html += `<h2>${escapeHtml(method.name)}</h2>`;
-  if (method.deprecated) {
-    html += `<span class="badge" style="background:#fef3c7;color:#b45309;">${escapeHtml(t('method.deprecated'))}</span>`;
-  }
+  render(
+    contentEl,
+    html`
+      <div class="card">
+        <h2>${method.name}</h2>
+        ${method.deprecated
+          ? html`<span class="badge" style="background:#fef3c7;color:#b45309;">${t('method.deprecated')}</span>`
+          : nothing}
 
-  if (method.summary) {
-    html += `<p class="summary">${escapeHtml(method.summary)}</p>`;
-  }
-  if (method.description) {
-    if (method.summary) {
-      html += `<details class="desc-details"><summary class="muted">${escapeHtml(t('method.descDetails'))}</summary><p class="subtitle">${escapeHtml(method.description)}</p></details>`;
-    } else {
-      html += `<p class="subtitle">${escapeHtml(method.description)}</p>`;
-    }
-  }
+        ${method.summary ? html`<p class="summary">${method.summary}</p>` : nothing}
 
-  html += `<div class="section-title">${escapeHtml(t('method.params.title'))}</div>`;
-  if (params.length) {
-    html += `<table><thead><tr>
-      <th>${escapeHtml(t('method.params.name'))}</th>
-      <th>${escapeHtml(t('method.params.type'))}</th>
-      <th>${escapeHtml(t('method.params.required'))}</th>
-      <th>${escapeHtml(t('method.params.description'))}</th>
-    </tr></thead><tbody>`;
-    for (const p of params) {
-      const desc = renderSummaryAndDescription(p.summary, p.description);
-      const required = p.required ? t('method.params.yes') : t('method.params.no');
-      html += `<tr>
-        <td><code>${escapeHtml(p.name ?? '')}</code></td>
-        <td>${renderSchemaType(p.schema)}</td>
-        <td>${escapeHtml(required)}</td>
-        <td class="muted">${desc}</td>
-      </tr>`;
-    }
-    html += `</tbody></table>`;
-  } else {
-    html += `<p class="empty-detail">${escapeHtml(t('method.params.empty'))}</p>`;
-  }
+        ${method.description
+          ? method.summary
+            ? html`<details class="desc-details"><summary class="muted">${t('method.descDetails')}</summary><p class="subtitle">${method.description}</p></details>`
+            : html`<p class="subtitle">${method.description}</p>`
+          : nothing}
 
-  html += `<div class="section-title">${escapeHtml(t('method.result.title'))}</div>`;
-  if (method.result) {
-    const desc = renderSummaryAndDescription(method.result.summary, method.result.description);
-    html += `<p>${renderSchemaType(method.result.schema)}${desc ? ' — ' + desc : ''}</p>`;
-  } else {
-    html += `<p class="empty-detail">${escapeHtml(t('method.result.empty'))}</p>`;
-  }
+        <div class="section-title">${t('method.params.title')}</div>
+        ${params.length
+          ? html`
+              <table>
+                <thead><tr>
+                  <th>${t('method.params.name')}</th>
+                  <th>${t('method.params.type')}</th>
+                  <th>${t('method.params.required')}</th>
+                  <th>${t('method.params.description')}</th>
+                </tr></thead>
+                <tbody>
+                  ${params.map((p) => html`
+                    <tr>
+                      <td><code>${p.name ?? ''}</code></td>
+                      <td>${schemaType(p.schema)}</td>
+                      <td>${p.required ? t('method.params.yes') : t('method.params.no')}</td>
+                      <td class="muted">${summaryDesc(p.summary, p.description)}</td>
+                    </tr>
+                  `)}
+                </tbody>
+              </table>
+            `
+          : html`<p class="empty-detail">${t('method.params.empty')}</p>`}
 
-  if (method.errors && method.errors.length) {
-    html += `<div class="section-title">${escapeHtml(t('method.errors.title'))}</div>`;
-    html += `<table><thead><tr>
-      <th style="width:100px;">${escapeHtml(t('method.errors.code'))}</th>
-      <th>${escapeHtml(t('method.errors.message'))}</th>
-    </tr></thead><tbody>`;
-    for (const e of method.errors) {
-      html += `<tr><td><code>${escapeHtml(e.code)}</code></td><td>${escapeHtml(e.message)}</td></tr>`;
-    }
-    html += `</tbody></table>`;
-  }
+        <div class="section-title">${t('method.result.title')}</div>
+        ${method.result
+          ? html`<p>${schemaType(method.result.schema)}${
+              method.result.summary || method.result.description
+                ? html` — ${summaryDesc(method.result.summary, method.result.description)}`
+                : nothing
+            }</p>`
+          : html`<p class="empty-detail">${t('method.result.empty')}</p>`}
 
-  if (method.examples && method.examples.length) {
-    html += `<div class="section-title">${escapeHtml(t('method.examples.title'))}</div>`;
-    method.examples.forEach((ex, i) => {
-      const label = ex.summary || ex.name || t('method.examples.label', { n: i + 1 });
-      html += `<p class="muted">${escapeHtml(label)}</p>`;
-      if (ex.params !== undefined) html += `<pre>${safeJson(ex.params)}</pre>`;
-      if (ex.result !== undefined) {
-        html += `<p class="muted">${escapeHtml(t('method.examples.result'))}</p><pre>${safeJson(ex.result)}</pre>`;
-      }
-    });
-  }
+        ${method.errors && method.errors.length
+          ? html`
+              <div class="section-title">${t('method.errors.title')}</div>
+              <table>
+                <thead><tr>
+                  <th style="width:100px;">${t('method.errors.code')}</th>
+                  <th>${t('method.errors.message')}</th>
+                </tr></thead>
+                <tbody>
+                  ${method.errors.map((e) => html`
+                    <tr><td><code>${e.code}</code></td><td>${e.message}</td></tr>
+                  `)}
+                </tbody>
+              </table>
+            `
+          : nothing}
 
-  html += `<div class="section-title">${escapeHtml(t('method.playground.title'))}</div>`;
-  html += `<div id="pgContainer"></div>`;
-  html += `</div>`;
-  contentEl.innerHTML = html;
+        ${method.examples && method.examples.length
+          ? html`
+              <div class="section-title">${t('method.examples.title')}</div>
+              ${method.examples.map((ex, i) => {
+                const label = ex.summary || ex.name || t('method.examples.label', { n: i + 1 });
+                return html`
+                  <p class="muted">${label}</p>
+                  ${ex.params !== undefined ? html`<pre>${json(ex.params)}</pre>` : nothing}
+                  ${ex.result !== undefined
+                    ? html`<p class="muted">${t('method.examples.result')}</p><pre>${json(ex.result)}</pre>`
+                    : nothing}
+                `;
+              })}
+            `
+          : nothing}
+
+        <div class="section-title">${t('method.playground.title')}</div>
+        <div id="pgContainer"></div>
+      </div>
+    `,
+  );
 
   const pgContainer = document.getElementById('pgContainer');
   if (pgContainer) renderPlayground(pgContainer, method, doc);

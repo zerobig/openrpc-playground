@@ -1,6 +1,7 @@
 import type { Method, OpenRpcDocument } from '../types';
 import { state } from '../state';
-import { escapeHtml, $ } from '../utils';
+import { $ } from '../utils';
+import { html, nothing, raw, render, type SafeHtml, type TemplateResult } from '../view';
 import {
   buildExampleParams,
   callBatch,
@@ -23,50 +24,55 @@ export function renderPlayground(
   const selectedUrl = savedUrl ?? defaultUrl ?? '';
   const auth = state.auths.get(method.name) ?? '';
   const byName = method.paramStructure === 'by-name';
-
-  let html = '';
-
-  if (servers.length > 1) {
-    html += `<div class="pg-row"><label for="pgServer">${escapeHtml(t('pg.server'))}</label><select id="pgServer">`;
-    for (const s of servers) {
-      const u = (s.url || '').replace(/\/+$/, '');
-      const label = (s.name ? s.name + ' — ' : '') + u;
-      html += `<option value="${escapeHtml(u)}"${u === selectedUrl ? ' selected' : ''}>${escapeHtml(label)}</option>`;
-    }
-    html += `</select></div>`;
-  } else if (!defaultUrl) {
-    html += `<p class="empty-detail">${escapeHtml(t('pg.noServer'))}</p>`;
-  }
-
   const draft = state.drafts.get(method.name);
   const paramsText = draft ?? JSON.stringify(buildExampleParams(method), null, 2);
   const labelKey = byName ? 'pg.params.labelByName' : 'pg.params.labelByPosition';
 
-  html += `<label class="muted" style="font-size:0.85rem;display:block;margin-bottom:4px;">${escapeHtml(t(labelKey))}</label>`;
-  html += `<textarea id="pgParams" class="pg-editor" spellcheck="false">${escapeHtml(paramsText)}</textarea>`;
+  render(
+    container,
+    html`
+      ${servers.length > 1
+        ? html`
+            <div class="pg-row">
+              <label for="pgServer">${t('pg.server')}</label>
+              <select id="pgServer">
+                ${servers.map((s) => {
+                  const u = (s.url || '').replace(/\/+$/, '');
+                  const label = (s.name ? s.name + ' — ' : '') + u;
+                  return html`<option value="${u}" ${u === selectedUrl ? raw('selected') : nothing}>${label}</option>`;
+                })}
+              </select>
+            </div>
+          `
+        : !defaultUrl
+          ? html`<p class="empty-detail">${t('pg.noServer')}</p>`
+          : nothing}
 
-  html += `<div class="pg-actions">
-    <button id="pgSend" class="btn btn-primary">${escapeHtml(t('pg.send'))}</button>
-    <button id="pgAddBatch" class="btn">${escapeHtml(t('pg.addToBatch'))}</button>
-    <button id="pgReset" class="btn">${escapeHtml(t('pg.reset'))}</button>
-    <span class="pg-spacer"></span>
-    <span id="pgHint" class="muted" style="font-size:0.8rem;"></span>
-  </div>`;
+      <label class="muted" style="font-size:0.85rem;display:block;margin-bottom:4px;">${t(labelKey)}</label>
+      <textarea id="pgParams" class="pg-editor" spellcheck="false">${paramsText}</textarea>
 
-  html += `<div class="pg-row" style="margin-top:8px;">
-    <label for="pgAuth">${escapeHtml(t('pg.auth.label'))}</label>
-    <input id="pgAuth" type="text" class="pg-auth"
-      placeholder="${escapeHtml(t('pg.auth.placeholder'))}"
-      value="${escapeHtml(auth)}" autocomplete="off" spellcheck="false" />
-  </div>`;
+      <div class="pg-actions">
+        <button id="pgSend" class="btn btn-primary">${t('pg.send')}</button>
+        <button id="pgAddBatch" class="btn">${t('pg.addToBatch')}</button>
+        <button id="pgReset" class="btn">${t('pg.reset')}</button>
+        <span class="pg-spacer"></span>
+        <span id="pgHint" class="muted" style="font-size:0.8rem;"></span>
+      </div>
 
-  html += `<div id="batchContainer"></div>`;
+      <div class="pg-row" style="margin-top:8px;">
+        <label for="pgAuth">${t('pg.auth.label')}</label>
+        <input id="pgAuth" type="text" class="pg-auth"
+          placeholder="${t('pg.auth.placeholder')}"
+          value="${auth}" autocomplete="off" spellcheck="false" />
+      </div>
 
-  html += `<div class="pg-response" id="pgResponse">
-    <div class="pg-response-head"><span class="muted">${escapeHtml(t('pg.response.placeholder'))}</span></div>
-  </div>`;
+      <div id="batchContainer"></div>
 
-  container.innerHTML = html;
+      <div class="pg-response" id="pgResponse">
+        <div class="pg-response-head"><span class="muted">${t('pg.response.placeholder')}</span></div>
+      </div>
+    `,
+  );
 
   bindPlayground(method, selectedUrl);
   updateBatchPanel();
@@ -79,7 +85,6 @@ function bindPlayground(method: Method, initialUrl: string): void {
   const pgReset = $<HTMLButtonElement>('pgReset');
   const pgHint = $<HTMLSpanElement>('pgHint');
   const pgAuth = $<HTMLInputElement>('pgAuth');
-  const responseBox = $<HTMLDivElement>('pgResponse');
   const pgServer = document.getElementById('pgServer') as HTMLSelectElement | null;
 
   let currentUrl = initialUrl;
@@ -118,9 +123,9 @@ function bindPlayground(method: Method, initialUrl: string): void {
 
   const readParams = (): { ok: true; params: unknown } | { ok: false; error: string } => {
     try {
-      const raw = (pgParams.value || '').trim();
+      const rawText = (pgParams.value || '').trim();
       const params =
-        raw === '' ? (method.paramStructure === 'by-name' ? {} : []) : JSON.parse(raw);
+        rawText === '' ? (method.paramStructure === 'by-name' ? {} : []) : JSON.parse(rawText);
       return { ok: true, params };
     } catch (e) {
       return { ok: false, error: (e as Error).message };
@@ -129,12 +134,14 @@ function bindPlayground(method: Method, initialUrl: string): void {
 
   const send = async (): Promise<void> => {
     if (!currentUrl) {
-      showError(responseBox, t('pg.error.noServer'));
+      const box = document.getElementById('pgResponse');
+      if (box) showError(box, t('pg.error.noServer'));
       return;
     }
     const parsed = readParams();
     if (!parsed.ok) {
-      showError(responseBox, t('pg.error.invalidParams', { message: parsed.error }));
+      const box = document.getElementById('pgResponse');
+      if (box) showError(box, t('pg.error.invalidParams', { message: parsed.error }));
       return;
     }
 
@@ -142,23 +149,27 @@ function bindPlayground(method: Method, initialUrl: string): void {
     const orig = pgSend.textContent ?? t('pg.send');
     pgSend.textContent = t('pg.sending');
     try {
-      const result = await callRpc(
-        currentUrl,
-        method,
-        parsed.params,
-        state.auths.get(method.name),
-      );
-      renderResponse(responseBox, result, currentUrl);
+      const result = await callRpc(currentUrl, method, parsed.params, state.auths.get(method.name));
+      // Re-lookup in case the DOM was re-rendered (e.g. locale switched mid-flight).
+      const box = document.getElementById('pgResponse');
+      if (box) renderResponse(box, result, currentUrl);
     } finally {
-      pgSend.disabled = false;
-      pgSend.textContent = orig;
+      const freshSend = document.getElementById('pgSend') as HTMLButtonElement | null;
+      if (freshSend) {
+        freshSend.disabled = false;
+        freshSend.textContent = t('pg.send');
+      } else {
+        pgSend.disabled = false;
+        pgSend.textContent = orig;
+      }
     }
   };
 
   pgAddBatch.addEventListener('click', () => {
     const parsed = readParams();
     if (!parsed.ok) {
-      showError(responseBox, t('pg.error.invalidParams', { message: parsed.error }));
+      const box = document.getElementById('pgResponse');
+      if (box) showError(box, t('pg.error.invalidParams', { message: parsed.error }));
       return;
     }
     state.batch.push({
@@ -183,32 +194,38 @@ function bindPlayground(method: Method, initialUrl: string): void {
 function updateBatchPanel(): void {
   const container = document.getElementById('batchContainer');
   if (!container) return;
-  container.innerHTML = renderBatchPanelHtml();
-  bindBatchPanel(container);
-}
 
-function renderBatchPanelHtml(): string {
-  if (!state.batch.length) return '';
-  const targetServer = state.batch[0].serverUrl || '—';
-  let html = `<div class="batch-panel">
-    <div class="batch-head">
-      <strong>${escapeHtml(t('pg.batch.title', { n: state.batch.length }))}</strong>
-      <span class="muted" style="font-family:monospace;font-size:0.78rem;">${escapeHtml(t('pg.batch.targetServer'))} ${escapeHtml(targetServer)}</span>
-      <span class="pg-spacer"></span>
-      <button id="pgBatchSend" class="btn btn-primary" style="padding:4px 12px;font-size:0.8rem;">${escapeHtml(t('pg.batch.send'))}</button>
-      <button id="pgBatchClear" class="btn" style="padding:4px 12px;font-size:0.8rem;">${escapeHtml(t('pg.batch.clear'))}</button>
-    </div>
-    <ul class="batch-list">`;
-  for (const item of state.batch) {
-    html += `<li>
-      <code>${escapeHtml(item.methodName)}</code>
-      <span class="muted">#${item.id}</span>
-      <span class="batch-params">${escapeHtml(JSON.stringify(item.params))}</span>
-      <button class="batch-remove" data-batch-id="${item.id}" title="${escapeHtml(t('pg.batch.remove'))}">×</button>
-    </li>`;
+  if (!state.batch.length) {
+    container.innerHTML = '';
+    return;
   }
-  html += `</ul></div>`;
-  return html;
+
+  const targetServer = state.batch[0].serverUrl || '—';
+  render(
+    container,
+    html`
+      <div class="batch-panel">
+        <div class="batch-head">
+          <strong>${t('pg.batch.title', { n: state.batch.length })}</strong>
+          <span class="muted" style="font-family:monospace;font-size:0.78rem;">${t('pg.batch.targetServer')} ${targetServer}</span>
+          <span class="pg-spacer"></span>
+          <button id="pgBatchSend" class="btn btn-primary" style="padding:4px 12px;font-size:0.8rem;">${t('pg.batch.send')}</button>
+          <button id="pgBatchClear" class="btn" style="padding:4px 12px;font-size:0.8rem;">${t('pg.batch.clear')}</button>
+        </div>
+        <ul class="batch-list">
+          ${state.batch.map((item) => html`
+            <li>
+              <code>${item.methodName}</code>
+              <span class="muted">#${item.id}</span>
+              <span class="batch-params">${JSON.stringify(item.params)}</span>
+              <button class="batch-remove" data-batch-id="${item.id}" title="${t('pg.batch.remove')}">×</button>
+            </li>
+          `)}
+        </ul>
+      </div>
+    `,
+  );
+  bindBatchPanel(container);
 }
 
 function bindBatchPanel(container: HTMLElement): void {
@@ -232,12 +249,11 @@ function bindBatchPanel(container: HTMLElement): void {
 
   if (sendBtn) {
     sendBtn.addEventListener('click', async () => {
-      const responseBox = document.getElementById('pgResponse');
-      if (!responseBox) return;
       if (!state.batch.length) return;
       const first = state.batch[0];
       if (!first.serverUrl) {
-        showError(responseBox, t('pg.batch.noServer'));
+        const box = document.getElementById('pgResponse');
+        if (box) showError(box, t('pg.batch.noServer'));
         return;
       }
       sendBtn.disabled = true;
@@ -245,7 +261,8 @@ function bindBatchPanel(container: HTMLElement): void {
       sendBtn.textContent = t('pg.batch.sending');
       try {
         const result = await callBatch(first.serverUrl, state.batch, first.auth);
-        renderResponse(responseBox, result, first.serverUrl);
+        const box = document.getElementById('pgResponse');
+        if (box) renderResponse(box, result, first.serverUrl);
       } finally {
         sendBtn.disabled = false;
         sendBtn.textContent = orig;
@@ -255,8 +272,13 @@ function bindBatchPanel(container: HTMLElement): void {
 }
 
 function showError(box: HTMLElement, message: string): void {
-  box.innerHTML = `<div class="pg-response-head"><span class="pg-status err">${escapeHtml(t('pg.error.title'))}</span></div>
-    <div class="pg-empty">${escapeHtml(message)}</div>`;
+  render(
+    box,
+    html`
+      <div class="pg-response-head"><span class="pg-status err">${t('pg.error.title')}</span></div>
+      <div class="pg-empty">${message}</div>
+    `,
+  );
 }
 
 function renderResponse(box: HTMLElement, r: RpcCallResult, url: string): void {
@@ -276,22 +298,26 @@ function renderResponse(box: HTMLElement, r: RpcCallResult, url: string): void {
     statusLabel = t('pg.status.http', { status: r.status, statusText: r.statusText, ms: r.ms });
   }
 
-  let bodyHtml: string;
+  let body: TemplateResult | SafeHtml;
   if (r.networkError) {
-    bodyHtml = `<pre>${escapeHtml(
-      t('pg.network.message', { url, error: r.networkError }),
-    )}</pre>`;
+    body = html`<pre>${t('pg.network.message', { url, error: r.networkError })}</pre>`;
   } else if (r.bodyPretty) {
-    bodyHtml = `<pre>${escapeHtml(r.bodyPretty)}</pre>`;
+    body = html`<pre>${r.bodyPretty}</pre>`;
   } else {
-    bodyHtml = `<div class="pg-empty">${escapeHtml(t('pg.response.empty'))}</div>`;
+    body = html`<div class="pg-empty">${t('pg.response.empty')}</div>`;
   }
 
-  box.innerHTML = `<div class="pg-response-head">
-    <span class="pg-status ${cls}">${escapeHtml(statusLabel)}</span>
-    <span class="pg-spacer"></span>
-    <button class="btn" id="pgCopyResp" style="padding:4px 10px;font-size:0.75rem;">${escapeHtml(t('pg.response.copy'))}</button>
-  </div>${bodyHtml}`;
+  render(
+    box,
+    html`
+      <div class="pg-response-head">
+        <span class="pg-status ${cls}">${statusLabel}</span>
+        <span class="pg-spacer"></span>
+        <button class="btn" id="pgCopyResp" style="padding:4px 10px;font-size:0.75rem;">${t('pg.response.copy')}</button>
+      </div>
+      ${body}
+    `,
+  );
 
   const copyBtn = document.getElementById('pgCopyResp') as HTMLButtonElement | null;
   if (copyBtn) {
