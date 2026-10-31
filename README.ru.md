@@ -113,8 +113,29 @@ http://localhost:5173/?spec=https://example.com/openrpc.json&lang=ru
 
 | Параметр | Действие                                                | Пример                         |
 | -------- | ------------------------------------------------------- | ------------------------------ |
-| `spec`   | Автозагрузка OpenRPC-схемы по URL                       | `?spec=https://x/openrpc.json` |
+| `spec`   | Автозагрузка OpenRPC-схемы по URL (см. ниже)            | `?spec=https://x/openrpc.json` |
 | `lang`   | Принудительный язык (`en`/`ru`), переопределяет storage | `?lang=ru`                     |
+
+### Определение URL схемы
+
+При старте URL схемы берётся из первого непустого источника:
+
+1. Query-параметр `?spec=<url>`.
+2. Глобальная переменная `window.OPENRPC_SPEC_URL` — задаётся через `<script>`
+   до подключения модуля.
+3. `<meta name="openrpc-spec-url" content="<url>">` в `<head>` документа.
+
+Удобно для встраивания: можно собрать `dist/index.html` один раз и поставлять
+его со «вшитым» URL схемы, сохранив при этом `?spec=` как runtime-override.
+Пример:
+
+```html
+<!-- Вариант A: meta-тег -->
+<meta name="openrpc-spec-url" content="https://example.com/openrpc.json">
+
+<!-- Вариант B: глобальная переменная перед бандлом -->
+<script>window.OPENRPC_SPEC_URL = 'https://example.com/openrpc.json';</script>
+```
 
 ## Структура проекта
 

@@ -110,10 +110,30 @@ http://localhost:5173/?spec=https://example.com/openrpc.json&lang=ru
 
 ## URL parameters
 
-| Param  | Effect                                         | Example                    |
-| ------ | ---------------------------------------------- | -------------------------- |
-| `spec` | Auto-load an OpenRPC schema from this URL      | `?spec=https://x/openrpc.json` |
-| `lang` | Force UI language (`en` or `ru`), overrides storage | `?lang=ru`            |
+| Param  | Effect                                              | Example                          |
+| ------ | --------------------------------------------------- | -------------------------------- |
+| `spec` | Auto-load an OpenRPC schema from this URL (see below) | `?spec=https://x/openrpc.json` |
+| `lang` | Force UI language (`en` or `ru`), overrides storage | `?lang=ru`                       |
+
+### Spec URL resolution
+
+On startup, the schema URL is resolved from the first non-empty source:
+
+1. `?spec=<url>` query parameter.
+2. `window.OPENRPC_SPEC_URL` global — set via a `<script>` before the module
+   script.
+3. `<meta name="openrpc-spec-url" content="<url>">` in the document `<head>`.
+
+This is convenient for embedding: you can build `dist/index.html` once and
+ship it with a baked-in schema URL, while still allowing `?spec=` as a runtime
+override. Example:
+
+```html
+<!-- Option A: meta tag -->
+<meta name="openrpc-spec-url" content="https://example.com/openrpc.json">
+
+<!-- Option B: global before the bundle -->
+<script>window.OPENRPC_SPEC_URL = 'https://example.com/openrpc.json';</script>
 
 ## Project structure
 
