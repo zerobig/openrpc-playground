@@ -164,19 +164,19 @@ contentEl.addEventListener('click', (e) => {
 });
 
 function resolveSpecUrl(): string | null {
-  // 1. Query-параметр
+  // 1. Query parameter
   const fromQuery = new URLSearchParams(location.search).get('spec');
   if (fromQuery && fromQuery.trim()) {
     return fromQuery.trim();
   }
 
-  // 2. Глобальная переменная (типизированный доступ)
+  // 2. Global variable (typed access)
   const globalUrl = (window as Window & { OPENRPC_SPEC_URL?: string }).OPENRPC_SPEC_URL;
   if (typeof globalUrl === 'string' && globalUrl.trim()) {
     return globalUrl.trim();
   }
 
-  // 3. Meta-тег (приведение к HTMLMetaElement)
+  // 3. Meta tag (typed access)
   const meta = document.querySelector<HTMLMetaElement>('meta[name="openrpc-spec-url"]');
   if (meta?.content?.trim()) {
     return meta.content.trim();
